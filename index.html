@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Swipe between maps</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <style>
+      body {
+        overflow: hidden;
+      }
+
+      body * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+
+      .map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-compare/v0.4.0/mapbox-gl-compare.js"></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"
+      integrity="sha512-zInFF17qBFVvvvFpIfeBzo7Tj7+rQxLeTJDmbxjBz5/zIr89YVbTNelNhdTT+/DCrxoVzBeUPVFJsczKbB7sew=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <link
+      rel="stylesheet"
+      href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-compare/v0.4.0/mapbox-gl-compare.css"
+      type="text/css"
+    />
+    <div id="comparison-container">
+      <div id="before" class="map"></div>
+      <div id="after" class="map"></div>
+    </div>
+    <script>
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoiZG5vbWFkYiIsImEiOiJjaW16aXFsZzUwNHJmdjdra3h0Nmd2cjY1In0.SqzkaKalXxQaPhQLjodQcQ";
+
+      const query = new URLSearchParams(window.location.search);
+      const styleUrl =
+        query.get("style") || "mapbox://styles/mapbox/streets-v11";
+      if (!query.get("style")) {
+        query.set("style", styleUrl);
+        window.location.search = query.toString();
+      }
+      const beforeMap = new mapboxgl.Map({
+        container: "before",
+        // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+        style: styleUrl,
+        center: [0, 0],
+        zoom: 0,
+        hash: true,
+      });
+
+      const afterMap = new mapboxgl.Map({
+        container: "after", // container ID
+        // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+        style: styleUrl, // style URL
+        center: [0, 0], // starting position [lng, lat]
+        zoom: 0, // starting zoom
+        hash: true,
+      });
+
+      const deepIter = (o) => {
+        return o.map((v) => {
+          if (chroma.valid(v) && typeof v !== "number") {
+            const color = chroma.rgb(
+              chroma(v)
+                .rgb()
+                .map((color) => {
+                  return 255 - color;
+                })
+            );
+            return color.set("hsl.h", (color.get("hsl.h") + 180) % 360).hex();
+          } else if (Array.isArray(v)) {
+            return deepIter(v);
+          } else {
+            return v;
+          }
+        });
+      };
+
+      afterMap.once("style.load", () => {
+        afterMap.setFog({}); // Set the default atmosphere style
+        const style = afterMap.getStyle();
+        style.layers = style.layers.map((layer, i) => {
+          if (layer.paint) {
+            for (const [k, v] of Object.entries(layer.paint)) {
+              if (/.*color/.test(k)) {
+                if (!Array.isArray(v)) {
+                  const color = chroma.rgb(
+                    chroma(v)
+                      .rgb()
+                      .map((color) => {
+                        return 255 - color;
+                      })
+                  );
+                  layer.paint[k] = color
+                    .set("hsl.h", (color.get("hsl.h") + 180) % 360)
+                    .hex();
+                } else {
+                  const expression = deepIter(v);
+                  // const expression = v.map((exA) => {
+                  //   if (chroma.valid(exA) && typeof exA !== "number") {
+                  //     const color = chroma.rgb(
+                  //       chroma(exA)
+                  //         .rgb()
+                  //         .map((color) => {
+                  //           return 255 - color;
+                  //         })
+                  //     );
+                  //     return color
+                  //       .set("hsl.h", (color.get("hsl.h") + 180) % 360)
+                  //       .hex();
+                  //   } else {
+                  //     return exA;
+                  //   }
+                  // });
+                  layer.paint[k] = expression;
+                }
+              }
+            }
+          }
+          return layer;
+        });
+        afterMap.setStyle(style);
+      });
+
+      // A selector or reference to HTML element
+      const container = "#comparison-container";
+
+      const map = new mapboxgl.Compare(beforeMap, afterMap, container, {
+        // Set this to enable comparing two maps by mouse movement:
+        // mousemove: true
+      });
+    </script>
+  </body>
+</html>
