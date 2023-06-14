@@ -114,8 +114,28 @@
         afterMap.setFog({}); // Set the default atmosphere style
         const style = afterMap.getStyle();
         style.layers = style.layers.map((layer, i) => {
-          if (layer.paint) {
+          if (layer.type == "raster") {
+            // raster styling needs different handling than vectors
+            let rotate = 180;
+            if ("paint" in layer && "raster-hue-rotate" in layer.paint) {
+              rotate = (layer.paint["raster-hue-rotate"] + 180) % 360;
+            }
+            let minBrightness = 1;
+            if ("paint" in layer && "raster-brightness-min" in layer.paint) {
+              minBrightness = 1 - layer.paint["raster-brightness-min"]
+            }
+            let maxBrightness = 0;
+            if ("paint" in layer && "raster-brightness-max" in layer.paint) {
+              maxBrightness = 1 - layer.paint["raster-brightness-max"];
+            }
+            layer.paint = {
+              "raster-hue-rotate": rotate,
+              "raster-brightness-min": minBrightness,
+              "raster-brightness-max": maxBrightness
+            }
+          } else if (layer.paint) {
             for (const [k, v] of Object.entries(layer.paint)) {
+              console.log(v)
               if (/.*color/.test(k)) {
                 if (!Array.isArray(v)) {
                   const color = chroma.rgb(
@@ -130,22 +150,6 @@
                     .hex();
                 } else {
                   const expression = deepIter(v);
-                  // const expression = v.map((exA) => {
-                  //   if (chroma.valid(exA) && typeof exA !== "number") {
-                  //     const color = chroma.rgb(
-                  //       chroma(exA)
-                  //         .rgb()
-                  //         .map((color) => {
-                  //           return 255 - color;
-                  //         })
-                  //     );
-                  //     return color
-                  //       .set("hsl.h", (color.get("hsl.h") + 180) % 360)
-                  //       .hex();
-                  //   } else {
-                  //     return exA;
-                  //   }
-                  // });
                   layer.paint[k] = expression;
                 }
               }
